@@ -19,7 +19,7 @@ type: page
 
 - GitHub：[wangfei910](https://github.com/wangfei910)
 - Email：<wangfei910@outlook.com>
-- CSDN：[Rabbit_Judy](http://my.csdn.net/?ref=toolbar)
+- CSDN：[Rabbit_Judy](http://blog.csdn.net/rabbit_judy)
 
 ## 竞赛
 
