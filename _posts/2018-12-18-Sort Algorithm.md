@@ -3,7 +3,7 @@ layout: post
 title:  "Sort Algorithm"
 categories: 数据结构与算法
 tags:  排序算法
-author: W.Sky
+author: W.Fly
 ---
 * content
 {:toc}
