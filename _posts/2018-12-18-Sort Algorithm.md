@@ -7,7 +7,7 @@ author: W.Fly
 ---
 * content
 {:toc}
-数据结构与算法：排序算法
+数据结构与算法
 
 ## 01算法分类
 ![image](https://github.com/wangfei910/wangfei910.github.io/raw/master/_pic/Sort%20Algorithm.png)
