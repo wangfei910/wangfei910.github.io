@@ -31,7 +31,7 @@ zookeeper 安装、启动、集群
 [root@mini1 ~]# cp -r zookeeper-3.4.5 /usr/local/zookeeper-cluster/zookeeper-2
 [root@mini1 ~]# cp -r zookeeper-3.4.5 /usr/local/zookeeper-cluster/zookeeper-3
 ```
-（5） 配置每一个 Zookeeper 的 dataDir（zoo.cfg） clientPort 分别为 2181  2182  2183
+（5） 配置每一个 Zookeeper 的 dataDir（zoo.cfg） clientPort 分别为 2181、2182、2183
 
 修改 /usr/local/zookeeper-cluster/zookeeper-1/conf/zoo.cfg
 
