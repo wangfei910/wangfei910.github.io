@@ -44,7 +44,7 @@ author: W.Fly
 
 ### Jmeter 压测并发量变化图
 
-![](<https://github.com/gongfukangEE/gongfukangEE.github.io/raw/master/_pic/%E5%88%86%E5%B8%83%E5%BC%8F/Jmeter%20%E5%8E%8B%E5%8A%9B%E6%B5%8B%E8%AF%95%20TPS.png>)
+![](<https://github.com/wangfei910/wangfei910.github.io/raw/master/_pic/%E5%88%86%E5%B8%83%E5%BC%8F/Jmeter%20%E5%8E%8B%E5%8A%9B%E6%B5%8B%E8%AF%95%20TPS.png>)
 
 ### 0. 基本秒杀逻辑
 
@@ -90,11 +90,11 @@ private int createOrder(Stock stock) throws Exception {
 
 超卖问题出现的场景
 
-![](https://github.com/gongfukangEE/gongfukangEE.github.io/raw/master/_pic/%E5%88%86%E5%B8%83%E5%BC%8F/%E7%A7%92%E6%9D%80%E8%B6%85%E5%8D%96.png)
+![](https://github.com/wangfei910/wangfei910.github.io/raw/master/_pic/%E5%88%86%E5%B8%83%E5%BC%8F/%E7%A7%92%E6%9D%80%E8%B6%85%E5%8D%96.png)
 
 悲观锁是表级锁，虽然可以解决超卖问题，但是由于排斥外部请求，会导致很多请求等待锁，卡死在这里，如果这种请求很多就会耗尽连接，系统出现异常。乐观锁默认不加锁，跟新失败就直接返回抢购失败，可以承受较高并发
 
-![](https://github.com/gongfukangEE/gongfukangEE.github.io/raw/master/_pic/%E5%88%86%E5%B8%83%E5%BC%8F/%E4%B9%90%E8%A7%82%E9%94%81%E6%89%A3%E5%BA%93%E5%AD%98.png)
+![](https://github.com/wangfei910/wangfei910.github.io/raw/master/_pic/%E5%88%86%E5%B8%83%E5%BC%8F/%E4%B9%90%E8%A7%82%E9%94%81%E6%89%A3%E5%BA%93%E5%AD%98.png)
 
 ```java
 @Override
@@ -116,13 +116,13 @@ public int createOptimisticOrder(int sid) throws Exception {
 
 根据前面的优化分析，假设现在有 10 个商品，有 1000 个并发秒杀请求，最终只有 10 个订单会成功创建，也就是说有 990 的请求是无效的，这些无效的请求也会给数据库带来压力，因此可以在在请求落到数据库之前就将无效的请求过滤掉，将并发控制在一个可控的范围，这样落到数据库的压力就小很多
 
-关于限流的方法，可以看这篇博客[浅析限流算法](<https://gongfukangee.github.io/2019/04/04/Limit/>)，由于计数限流实现起来比较简单，因此采用计数限流，限流的实现可以直接使用 Guava 的 RateLimit 方法，但是由于后续需要将实例通过 Nginx 实现负载均衡，这里选用 Redis 实现分布式限流
+关于限流的方法，可以看这篇博客[浅析限流算法](<https://wangfei910.github.io/2019/04/12/Limit/>)，由于计数限流实现起来比较简单，因此采用计数限流，限流的实现可以直接使用 Guava 的 RateLimit 方法，但是由于后续需要将实例通过 Nginx 实现负载均衡，这里选用 Redis 实现分布式限流
 
 在 `RedisPool` 中对 `Jedis` 线程池进行了简单的封装，封装了初始化和关闭方法，同时在 `RedisPoolUtil` 中对 Jedis 常用 API 进行简单封装，每个方法调用完毕则关闭 Jedis 连接。
 
 限流要保证写入 Redis 操作的原子性，因此利用 Redis 的单线程机制，通过 LUA 脚本来完成。
 
-![](https://github.com/gongfukangEE/gongfukangEE.github.io/raw/master/_pic/%E5%88%86%E5%B8%83%E5%BC%8F/%E7%A7%92%E6%9D%80%E9%99%90%E6%B5%81.png)
+![](https://github.com/wangfei910/wangfei910.github.io/raw/master/_pic/%E5%88%86%E5%B8%83%E5%BC%8F/%E7%A7%92%E6%9D%80%E9%99%90%E6%B5%81.png)
 
 ```java
 @Slf4j
@@ -177,7 +177,7 @@ public String createOptimisticLimitOrder(HttpServletRequest request, int sid) {
 
 虽然限流能够过滤掉一些无效的请求，但是还是会有很多请求落在数据库上，通过 `Druid` 监控可以看出，实时查询库存的语句被大量调用，对于每个没有被过滤掉的请求，都会去数据库查询库存来判断库存是否充足，对于这个查询可以放在缓存 Redis 中，Redis 的数据是存放在内存中的，速度快很多。
 
-![](<https://github.com/gongfukangEE/gongfukangEE.github.io/raw/master/_pic/%E5%88%86%E5%B8%83%E5%BC%8F/Redis%20%E7%BC%93%E5%AD%98%E5%BA%93%E5%AD%98%E4%BF%A1%E6%81%AF.png>)
+![](<https://github.com/wangfei910/wangfei910.github.io/raw/master/_pic/%E5%88%86%E5%B8%83%E5%BC%8F/Redis%20%E7%BC%93%E5%AD%98%E5%BA%93%E5%AD%98%E4%BF%A1%E6%81%AF.png>)
 
 #### 缓存预热
 
@@ -211,11 +211,11 @@ public class RedisPreheatRunner implements ApplicationRunner {
 
 缓存和 DB 的一致性是一个讨论很多的问题，推荐看参考中的 [使用缓存的正确姿势](<https://juejin.im/post/5af5b2c36fb9a07ac65318bd#heading-11>)，首先看下先更新数据库，再更新缓存策略，假设 A、B 两个线程，A 成功更新数据，在要更新缓存时，A 的时间片用完了，B 更新了数据库接着更新了缓存，这是 CPU 再分配给 A，则 A 又更新了缓存，这种情况下缓存中就是脏数据，具体逻辑如下图所示：
 
-![](<https://github.com/gongfukangEE/gongfukangEE.github.io/raw/master/_pic/%E5%88%86%E5%B8%83%E5%BC%8F/%E5%85%88%E6%9B%B4%E6%96%B0%E6%95%B0%E6%8D%AE%E5%BA%93%E5%86%8D%E6%9B%B4%E6%96%B0%E7%BC%93%E5%AD%98.png>)
+![](<https://github.com/wangfei910/wangfei910.github.io/raw/master/_pic/%E5%88%86%E5%B8%83%E5%BC%8F/%E5%85%88%E6%9B%B4%E6%96%B0%E6%95%B0%E6%8D%AE%E5%BA%93%E5%86%8D%E6%9B%B4%E6%96%B0%E7%BC%93%E5%AD%98.png>)
 
 那么，如果避免这个问题呢？就是缓存不做更新，仅做删除，先更新数据库再删除缓存。对于上面的问题，A 更新了数据库，还没来得及删除缓存，B 又更新了数据库，接着删除了缓存，然后 A 删除了缓存，这样只有下次缓存未命中时，才会从数据库中重建缓存，避免了脏数据。但是，也会有极端情况出现脏数据，A 做查询操作，没有命中缓存，从数据库中查询，但是还没来得及更新缓存，B 就更新了数据库，接着删除了缓存，然后 A 又重建了缓存，这时 A 中的就是脏数据，如下图所示。但是这种极端情况需要数据库的写操作前进入数据库，又晚于写操作删除缓存来更新缓存，发生的概率极其小，不过为了避免这种情况，可以为缓存设置过期时间。
 
-![](<https://github.com/gongfukangEE/gongfukangEE.github.io/raw/master/_pic/%E5%88%86%E5%B8%83%E5%BC%8F/%E5%85%88%E6%9B%B4%E6%96%B0%E6%95%B0%E6%8D%AE%E5%BA%93%E5%86%8D%E5%88%A0%E9%99%A4%E7%BC%93%E5%AD%98.png>)
+![](<https://github.com/wangfei910/wangfei910.github.io/raw/master/_pic/%E5%88%86%E5%B8%83%E5%BC%8F/%E5%85%88%E6%9B%B4%E6%96%B0%E6%95%B0%E6%8D%AE%E5%BA%93%E5%86%8D%E5%88%A0%E9%99%A4%E7%BC%93%E5%AD%98.png>)
 
 安装先更新数据库再删除缓存的策略来执行，代码如下所示：
 
@@ -278,7 +278,7 @@ private void saleStockOptimsticWithRedisWithDel(Stock stock) throws Exception {
 
 考虑到使用乐观锁更新数据库，因此在使用先更新数据库再更新缓存的策略中，实际情况如下所示
 
-![](<https://github.com/gongfukangEE/gongfukangEE.github.io/raw/master/_pic/%E5%88%86%E5%B8%83%E5%BC%8F/%E5%85%88%E6%9B%B4%E6%96%B0%E6%95%B0%E6%8D%AE%E5%BA%93%E5%86%8D%E6%9B%B4%E6%96%B0%E7%BC%93%E5%AD%98V2.png>)
+![](<https://github.com/wangfei910/wangfei910.github.io/raw/master/_pic/%E5%88%86%E5%B8%83%E5%BC%8F/%E5%85%88%E6%9B%B4%E6%96%B0%E6%95%B0%E6%8D%AE%E5%BA%93%E5%86%8D%E6%9B%B4%E6%96%B0%E7%BC%93%E5%AD%98V2.png>)
 
 在 A 未更新缓存阶段，虽然 B 从缓存中获取到的库存信息脏数据，但是，乐观锁使得 B 在更新数据库时失败，这时 A 又更新了缓存，则保证了数据的最终一致性，并且由于缓存一直都可以命中，对并发量的提升也是很显著的。
 
@@ -348,7 +348,7 @@ public static void updateStockWithRedis(Stock stock) {
 
 项目中采用的是用消息队列 Kafka 来缓冲瞬时流量，将同步的直接调用转成异步的间接推送，中间通过一个队列在一端承接瞬时的流量洪峰，在另一端平滑地将消息推送出去。
 
-![](<https://github.com/gongfukangEE/gongfukangEE.github.io/raw/master/_pic/%E5%88%86%E5%B8%83%E5%BC%8F/%E6%B6%88%E6%81%AF%E9%98%9F%E5%88%97%E7%BC%93%E5%86%B2.png>)
+![](<https://github.com/wangfei910/wangfei910.github.io/raw/master/_pic/%E5%88%86%E5%B8%83%E5%BC%8F/%E6%B6%88%E6%81%AF%E9%98%9F%E5%88%97%E7%BC%93%E5%86%B2.png>)
 
 关于 Kafka 的学习，推荐[朱小厮的博客](<https://juejin.im/user/5baf7ec26fb9a05cff32266e>)和博主的书《深入理解 Kafka：核心设计与实践原理》，向 Kafka 发送消息和从 Kafka 拉取消息需要对消息进行序列化处理，这里采用的是`Gson`框架
 
