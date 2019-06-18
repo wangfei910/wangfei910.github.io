@@ -342,6 +342,22 @@ public static void updateStockWithRedis(Stock stock) {
 }
 ```
 
+#### 发现热点数据
+
+热点数据就是用户的热点请求对应的数据，分成静态热点数据和动态热点数据。
+
+静态热点数据就是能够提前预测的数据，比如约定商品 A、B、C 参与秒杀，则可以提前对商品进行标记处理。动态热点数据就是不能被提前预测的，比如在商家在抖音上投放广告，导致商品短时间内被大量购买，临时产生热点数据。对于动态热点数据，最主要的就是能够提前预测和发现，以便于及时处理，这里给出[极客时间：许令波 - 如何设计一个秒杀系统](<https://time.geekbang.org/column/intro/127>)中对于热点数据发现系统的实现：
+
+1. 构建一个异步的系统，它可以收集交易链路上各个环节中的中间件产品的热点 Key
+2. 建立一个热点上报和可以按照需求订阅的热点服务的下发规范，主要目的是通过交易链路上各个系统（包括详情、购物车、交易、优惠、库存、物流等）访问的时间差，把上游已经发现的热点透传给下游系统，提前做好保护。
+3. 将上游系统收集的热点数据发送到热点服务台，然后下游系统（如交易系统）就会知道哪些商品会被频繁调用，然后做热点保护。
+
+![](<https://github.com/gongfukangEE/gongfukangEE.github.io/raw/master/_pic/%E5%88%86%E5%B8%83%E5%BC%8F/%E7%A7%92%E6%9D%80%E7%83%AD%E7%82%B9%E6%95%B0%E6%8D%AE.png>)
+
+我们通过部署在每台机器上的 Agent 把日志汇总到聚合和分析集群中，然后把符合一定规则的热点数据，通过订阅分发系统再推送到相应的系统中。你可以是把热点数据填充到 Cache 中，或者直接推送到应用服务器的内存中，还可以对这些数据进行拦截，总之下游系统可以订阅这些数据，然后根据自己的需求决定如何处理这些数据。
+
+对于热点数据，除了上文所提到的缓存，还要进行隔离和限制，比如把热点商品限制在一个请求队列里，防止因某些热点商品占用太多的服务器资源，而使其他请求始终得不到服务器的处理资源；将这种热点数据隔离出来，不要让 1% 的请求影响到另外的 99% 。
+
 ### 4. Kafka 异步
 
 服务器的资源是恒定的，你用或者不用它的处理能力都是一样的，所以出现峰值的话，很容易导致忙到处理不过来，闲的时候却又没有什么要处理，因此可以通过削峰来延缓用户请求的发出，让服务端处理变得更加平稳。
@@ -394,6 +410,71 @@ public int consumerTopicToCreateOrderWithKafka(Stock stock) throws Exception {
     return res;
 }
 ```
+
+### 5. Nginx 负载均衡
+
+单台服务器的处理性能是有瓶颈的，当并发量十分大时，无论怎么优化都满足不了需求，这时候就需要增加一台服务器分担原有服务器的访问压力，通过负载均衡服务器 Nginx 可以将来自用户的访问请求发到应用服务器集群中的任何一台机器
+
+Nginx 配置如下：
+
+在项目的配置文件 application.properties 中分别设置两个应用的端口号如 8888 和 9999 。
+```
+server.port=8888
+server.port=9999
+```
+
+然后进入nginx/conf文件目录将nginx.conf配置文件中的http部分修改为如下代码：
+```
+http {
+    include       mime.types;
+    default_type  application/octet-stream;
+
+    #log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+    #                  '$status $body_bytes_sent "$http_referer" '
+    #                  '"$http_user_agent" "$http_x_forwarded_for"';
+
+    #access_log  logs/access.log  main;
+
+    sendfile        on;
+    #tcp_nopush     on;
+
+    #keepalive_timeout  0;
+    keepalive_timeout  65;
+
+    #gzip  on;
+
+    upstream server_miaosha{
+        server 127.0.0.1:8888 weight=1;
+        server 127.0.0.1:9999 weight=1;
+    }
+
+    server {
+        listen  80;
+        server_name  localhost;
+
+        #charset koi8-r;
+
+        #access_log  logs/host.access.log  main;
+
+        location / {
+            #root html;
+            #index index.html index.htm;
+            set $xheader $remote_addr;
+            if ( $http_x_forwarded_for != '' ){
+                set $xheader $http_x_forwarded_for;
+            }
+            proxy_set_header X-Real-IP $xheader;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header Host $http_host;
+            proxy_redirect off;
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+            proxy_pass http://server_miaosha;
+        }
+
+        #error_page  404     /404.html;
+```
+权重weight可以根据个人需求进行设置，本文均设置为 1 ，表示访问 IP + 80 端口时两个应用按 1:1 进行轮询。
 
 ## Github
 
