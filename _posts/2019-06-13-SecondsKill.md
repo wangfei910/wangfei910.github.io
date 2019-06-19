@@ -83,7 +83,7 @@ private int createOrder(Stock stock) throws Exception {
     return res;
 }
 // 扣库存 Mapper 文件
-@Update("UPDATE stock SET count = #{count, jdbcType = INTEGER}, name = #{name, jdbcType = 			     VARCHAR}, " + "sale = #{sale,jdbcType = INTEGER},version = #{version,jdbcType = INTEGER} " + "WHERE id = #{id, jdbcType = INTEGER}")
+@Update("UPDATE stock SET count = #{count, jdbcType = INTEGER}, name = #{name, jdbcType = VARCHAR}, " + "sale = #{sale,jdbcType = INTEGER},version = #{version,jdbcType = INTEGER} " + "WHERE id = #{id, jdbcType = INTEGER}")
 ```
 
 ### 1. 乐观锁更新库存，解决超卖问题
@@ -92,7 +92,7 @@ private int createOrder(Stock stock) throws Exception {
 
 ![](https://github.com/wangfei910/wangfei910.github.io/raw/master/_pic/%E5%88%86%E5%B8%83%E5%BC%8F/%E7%A7%92%E6%9D%80%E8%B6%85%E5%8D%96.png)
 
-悲观锁是表级锁，虽然可以解决超卖问题，但是由于排斥外部请求，会导致很多请求等待锁，卡死在这里，如果这种请求很多就会耗尽连接，系统出现异常。乐观锁默认不加锁，跟新失败就直接返回抢购失败，可以承受较高并发
+悲观锁是表级锁，虽然可以解决超卖问题，但是由于排斥外部请求，会导致很多请求等待锁，卡死在这里，如果这种请求很多，就会耗尽连接，系统出现异常。乐观锁默认不加锁，更新失败就直接返回抢购失败，可以承受较高并发。
 
 ![](https://github.com/wangfei910/wangfei910.github.io/raw/master/_pic/%E5%88%86%E5%B8%83%E5%BC%8F/%E4%B9%90%E8%A7%82%E9%94%81%E6%89%A3%E5%BA%93%E5%AD%98.png)
 
@@ -114,11 +114,11 @@ public int createOptimisticOrder(int sid) throws Exception {
 
 ### 2. Redis 计数限流
 
-根据前面的优化分析，假设现在有 10 个商品，有 1000 个并发秒杀请求，最终只有 10 个订单会成功创建，也就是说有 990 的请求是无效的，这些无效的请求也会给数据库带来压力，因此可以在在请求落到数据库之前就将无效的请求过滤掉，将并发控制在一个可控的范围，这样落到数据库的压力就小很多
+根据前面的优化分析，假设现在有 10 个商品，有 1000 个并发秒杀请求，最终只有 10 个订单会成功创建，也就是说有 990 的请求是无效的，这些无效的请求也会给数据库带来压力，因此可以在请求落到数据库之前就将无效的请求过滤掉，将并发控制在一个可控的范围，这样落到数据库的压力就小很多。
 
-关于限流的方法，可以看这篇博客[浅析限流算法](<https://wangfei910.github.io/2019/04/12/Limit/>)，由于计数限流实现起来比较简单，因此采用计数限流，限流的实现可以直接使用 Guava 的 RateLimit 方法，但是由于后续需要将实例通过 Nginx 实现负载均衡，这里选用 Redis 实现分布式限流
+关于限流的方法，可以看这篇博客[浅析限流算法](<https://wangfei910.github.io/2019/04/12/Limit/>)，由于计数限流实现起来比较简单，因此采用计数限流，限流的实现可以直接使用 Guava 的 RateLimit 方法，但是后续需要将实例通过 Nginx 实现负载均衡，所以这里选用 Redis 实现分布式限流。
 
-在 `RedisPool` 中对 `Jedis` 线程池进行了简单的封装，封装了初始化和关闭方法，同时在 `RedisPoolUtil` 中对 Jedis 常用 API 进行简单封装，每个方法调用完毕则关闭 Jedis 连接。
+在 `RedisPool` 中对 `Jedis` 线程池进行了简单的封装，封装了初始化和关闭方法，同时在 `RedisPoolUtil` 中对 Jedis 常用 API 进行简单封装，每个方法调用完毕后关闭 Jedis 连接。
 
 限流要保证写入 Redis 操作的原子性，因此利用 Redis 的单线程机制，通过 LUA 脚本来完成。
 
@@ -181,7 +181,7 @@ public String createOptimisticLimitOrder(HttpServletRequest request, int sid) {
 
 #### 缓存预热
 
-在秒杀开始前，需要将秒杀商品信息提前缓存到 Redis 中，这么秒杀开始时则直接从 Redis 中读取，也就是缓存预热，Springboot 中开发者通过 `implement ApplicationRunner` 来设定 SpringBoot 启动后立即执行的方法
+在秒杀开始前，需要将秒杀商品信息提前缓存到 Redis 中，这样秒杀开始时则直接从 Redis 中读取，也就是缓存预热，Springboot 中开发者通过 `implement ApplicationRunner` 来设定 SpringBoot 启动后立即执行的方法。
 
 ```java
 @Component
@@ -202,22 +202,22 @@ public class RedisPreheatRunner implements ApplicationRunner {
         int sid = stock.getId();
         RedisPoolUtil.set(RedisKeysConstant.STOCK_COUNT + sid, String.valueOf(stock.getCount()));
         RedisPoolUtil.set(RedisKeysConstant.STOCK_SALE + sid, String.valueOf(stock.getSale()));
-        RedisPoolUtil.set(RedisKeysConstant.STOCK_VERSION + sid, 			String.valueOf(stock.getVersion()));
+        RedisPoolUtil.set(RedisKeysConstant.STOCK_VERSION + sid, String.valueOf(stock.getVersion()));
     }
 }
 ```
 
 #### 缓存和数据一致性
 
-缓存和 DB 的一致性是一个讨论很多的问题，推荐看参考中的 [使用缓存的正确姿势](<https://juejin.im/post/5af5b2c36fb9a07ac65318bd#heading-11>)，首先看下先更新数据库，再更新缓存策略，假设 A、B 两个线程，A 成功更新数据，在要更新缓存时，A 的时间片用完了，B 更新了数据库接着更新了缓存，这是 CPU 再分配给 A，则 A 又更新了缓存，这种情况下缓存中就是脏数据，具体逻辑如下图所示：
+缓存和 DB 的一致性是一个讨论很多的问题，推荐看参考中的 [使用缓存的正确姿势](<https://juejin.im/post/5af5b2c36fb9a07ac65318bd#heading-11>)，首先看下先更新数据库，再更新缓存策略，假设 A、B 两个线程，A 成功更新数据，在要更新缓存时，A 的时间片用完了，B 更新了数据库接着更新了缓存，这时 CPU 再分配给 A，则 A 又更新了缓存，这种情况下缓存中就是脏数据，具体逻辑如下图所示：
 
 ![](<https://github.com/wangfei910/wangfei910.github.io/raw/master/_pic/%E5%88%86%E5%B8%83%E5%BC%8F/%E5%85%88%E6%9B%B4%E6%96%B0%E6%95%B0%E6%8D%AE%E5%BA%93%E5%86%8D%E6%9B%B4%E6%96%B0%E7%BC%93%E5%AD%98.png>)
 
-那么，如果避免这个问题呢？就是缓存不做更新，仅做删除，先更新数据库再删除缓存。对于上面的问题，A 更新了数据库，还没来得及删除缓存，B 又更新了数据库，接着删除了缓存，然后 A 删除了缓存，这样只有下次缓存未命中时，才会从数据库中重建缓存，避免了脏数据。但是，也会有极端情况出现脏数据，A 做查询操作，没有命中缓存，从数据库中查询，但是还没来得及更新缓存，B 就更新了数据库，接着删除了缓存，然后 A 又重建了缓存，这时 A 中的就是脏数据，如下图所示。但是这种极端情况需要数据库的写操作前进入数据库，又晚于写操作删除缓存来更新缓存，发生的概率极其小，不过为了避免这种情况，可以为缓存设置过期时间。
+那么，如果避免这个问题呢？就是缓存不做更新，仅做删除，先更新数据库再删除缓存。对于上面的问题，A 更新了数据库，还没来得及删除缓存，B 又更新了数据库，接着删除了缓存，然后 A 删除了缓存，这样只有下次缓存未命中时，才会从数据库中重建缓存，避免了脏数据。但是，也会有极端情况出现脏数据，比如 A 做查询操作，没有命中缓存，从数据库中查询，但是还没来得及更新缓存，B 就更新了数据库，接着删除了缓存，然后 A 又重建了缓存，这时 A 中的就是脏数据，如下图所示。但是这种极端情况需要比数据库的写操作先进入数据库，又晚于写操作删除缓存来更新缓存，发生的概率极其小，不过为了避免这种情况，可以为缓存设置过期时间。
 
 ![](<https://github.com/wangfei910/wangfei910.github.io/raw/master/_pic/%E5%88%86%E5%B8%83%E5%BC%8F/%E5%85%88%E6%9B%B4%E6%96%B0%E6%95%B0%E6%8D%AE%E5%BA%93%E5%86%8D%E5%88%A0%E9%99%A4%E7%BC%93%E5%AD%98.png>)
 
-安装先更新数据库再删除缓存的策略来执行，代码如下所示：
+按照先更新数据库再删除缓存的策略来执行，代码如下所示：
 
 ```java
 @Override
@@ -276,11 +276,11 @@ private void saleStockOptimsticWithRedisWithDel(Stock stock) throws Exception {
 
 在 Jmeter 压力测试中，并发效果并不好，跟前面的限流并发差不多，观察 Redis 中的数据看出，由于每次都删除缓存，因此导致多次缓存都不能命中，能命中缓存的次数很少，因此这种方案并不可取。
 
-考虑到使用乐观锁更新数据库，因此在使用先更新数据库再更新缓存的策略中，实际情况如下所示
+考虑到使用乐观锁更新数据库，因此在使用先更新数据库再更新缓存的策略中，实际情况如下所示：
 
 ![](<https://github.com/wangfei910/wangfei910.github.io/raw/master/_pic/%E5%88%86%E5%B8%83%E5%BC%8F/%E5%85%88%E6%9B%B4%E6%96%B0%E6%95%B0%E6%8D%AE%E5%BA%93%E5%86%8D%E6%9B%B4%E6%96%B0%E7%BC%93%E5%AD%98V2.png>)
 
-在 A 未更新缓存阶段，虽然 B 从缓存中获取到的库存信息脏数据，但是，乐观锁使得 B 在更新数据库时失败，这时 A 又更新了缓存，则保证了数据的最终一致性，并且由于缓存一直都可以命中，对并发量的提升也是很显著的。
+在 A 未更新缓存阶段，虽然 B 从缓存中获取到的库存信息脏数据，但是，乐观锁使得 B 在更新数据库时失败，这时 A 又更新了缓存，所以保证了数据的最终一致性，并且由于缓存一直都可以命中，所以并发量也有显著提升。
 
 ```java
 @Override
@@ -348,7 +348,7 @@ public static void updateStockWithRedis(Stock stock) {
 
 静态热点数据就是能够提前预测的数据，比如约定商品 A、B、C 参与秒杀，则可以提前对商品进行标记处理。动态热点数据就是不能被提前预测的，比如在商家在抖音上投放广告，导致商品短时间内被大量购买，临时产生热点数据。对于动态热点数据，最主要的就是能够提前预测和发现，以便于及时处理，这里给出[极客时间：许令波 - 如何设计一个秒杀系统](<https://time.geekbang.org/column/intro/127>)中对于热点数据发现系统的实现：
 
-1. 构建一个异步的系统，它可以收集交易链路上各个环节中的中间件产品的热点 Key
+1. 构建一个异步的系统，它可以收集交易链路上各个环节中的中间件产品的热点 Key 。
 2. 建立一个热点上报和可以按照需求订阅的热点服务的下发规范，主要目的是通过交易链路上各个系统（包括详情、购物车、交易、优惠、库存、物流等）访问的时间差，把上游已经发现的热点透传给下游系统，提前做好保护。
 3. 将上游系统收集的热点数据发送到热点服务台，然后下游系统（如交易系统）就会知道哪些商品会被频繁调用，然后做热点保护。
 
@@ -360,7 +360,7 @@ public static void updateStockWithRedis(Stock stock) {
 
 ### 4. Kafka 异步
 
-服务器的资源是恒定的，你用或者不用它的处理能力都是一样的，所以出现峰值的话，很容易导致忙到处理不过来，闲的时候却又没有什么要处理，因此可以通过削峰来延缓用户请求的发出，让服务端处理变得更加平稳。
+服务器的资源是恒定的，你用或者不用，它的处理能力都是一样的，所以出现峰值的话，很容易导致忙到处理不过来，闲的时候却又没有什么要处理，因此可以通过削峰来延缓用户请求的发出，让服务端处理变得更加平稳。
 
 项目中采用的是用消息队列 Kafka 来缓冲瞬时流量，将同步的直接调用转成异步的间接推送，中间通过一个队列在一端承接瞬时的流量洪峰，在另一端平滑地将消息推送出去。
 
@@ -406,14 +406,13 @@ public int consumerTopicToCreateOrderWithKafka(Stock stock) throws Exception {
     } else {
         log.info("Kafka 消费 Topic 创建订单失败");
     }
-
     return res;
 }
 ```
 
 ### 5. Nginx 负载均衡
 
-单台服务器的处理性能是有瓶颈的，当并发量十分大时，无论怎么优化都满足不了需求，这时候就需要增加一台服务器分担原有服务器的访问压力，通过负载均衡服务器 Nginx 可以将来自用户的访问请求发到应用服务器集群中的任何一台机器
+单台服务器的处理性能是有瓶颈的，当并发量十分大时，无论怎么优化都满足不了需求，这时候就需要增加一台服务器分担原有服务器的访问压力，通过负载均衡服务器 Nginx 可以将来自用户的访问请求发到应用服务器集群中的任何一台机器。
 
 Nginx 配置如下：
 
